@@ -12,10 +12,10 @@ module PolyRec.Syntax
     Sigma,
     Typing,
     Env,
-    consts, 
+    consts,
     emptyEnv,
     fVar,
-    Error(UnifyErr,SpcErr,MiscErr,TypeError,Impossible), UnifyError(ECircular,EUnsolvable,EInfty) 
+    Error(UnifyErr,SpcErr,MiscErr,TypeError,Impossible), UnifyError(ECircular,EUnsolvable,EInfty)
   )
 where
 
@@ -30,6 +30,7 @@ data Const =
   Nil|Not|And|Or|Plus|Minus|Times|Equiv|Lt|Null|Fst|Snd|Hd|Tl|
   Pair|Cons|Ifc
   deriving (Eq,Ord,Show)
+
 
 consts :: Map Const Type
 consts = Map.fromList [
@@ -52,8 +53,11 @@ consts = Map.fromList [
   (Ifc,TyAll [0] (TyFun (TyCon TyBool) (TyFun (TyVar 0) (TyFun (TyVar 0) (TyVar 0)))))]
 
 data Lit = LInt Int | LBool Bool
-  deriving (Eq, Show)
+  deriving (Eq)
 
+instance Show Lit where
+  show (LInt n) = show n
+  show (LBool b) = show b
 
 data Term where
   TmLit :: Lit -> Term
@@ -63,11 +67,26 @@ data Term where
   TmAbs :: Name -> Term -> Term
   TmRec :: Name -> Term -> Term
   TmLet :: Name -> Term -> Term ->  Term
-  deriving (Eq,Show)
+  deriving (Eq)
 
 type Uniq = Int
 
--- |  ::= bool | int |α | u1 → u2 | u1 × u2 | u list.
+instance Show Term where
+  -- showsPrec _ (TmLit x) = showString $ show x
+  -- showsPrec _ (TmVar x) = showString x
+  -- showsPrec p (TmApp t1 t2) = showsPrec p t1 . showString " " . showsPrec p t2
+  -- showsPrec p (TmAbs x t) = showString "fun " . showsPrec p x . showString "." . showsPrec p t
+  -- showsPrec p (TmRec x t) = showString "fix " . showsPrec p x . showString "." . showsPrec p t
+  -- showsPrec p (TmLet x t1 t2) = showString "let " . showsPrec p x . showString " = " .showsPrec p t1 . showString " in " . showsPrec p t2
+  -- showsPrec _ (TmConst c) = showString $ show c
+  showsPrec p (TmLit x) = showString $ show x
+  showsPrec p (TmVar x) = showString x
+  showsPrec p (TmApp t1 t2) = showParen (p > 6) $ showsPrec 6 t1 . showString " " . showsPrec 7 t2
+  showsPrec p (TmAbs x t) = showParen (p > 6) $ showString "fun " . showsPrec 7 x . showString "." . showsPrec 6 t
+  showsPrec p (TmRec x t) = showParen (p > 6) $ showString "rec" . showsPrec 7 x . showString "." . showsPrec 6 t
+  showsPrec p (TmLet x t1 t2) = showString "let " . showsPrec p x . showString " = " . showsPrec p t1 . showString " in " . showsPrec p t2
+  showsPrec _ (TmConst c) = showString $ show c
+  
 data Type where
   TyVar :: Uniq -> Type
   TyCon :: TyCon -> Type
@@ -75,8 +94,17 @@ data Type where
   TyProd :: Tau -> Tau -> Type
   TyList :: Tau -> Type
   TyAll :: [Uniq] -> Tau -> Type
-  deriving (Eq,Ord,Show)
+  deriving (Eq)
 
+instance Show Type where
+  showsPrec p (TyVar x) = showString "v" .showsPrec 11 x
+  showsPrec p (TyCon TyInt) = showString "int"
+  showsPrec p (TyCon TyBool) = showString "bool"
+  showsPrec p (TyFun t1 t2) = showParen (p > 6) $ showsPrec 7 t1 . showString "->" . showsPrec 6 t2
+  showsPrec p (TyProd t1 t2) = showParen (p > 6) $ showsPrec 7 t1 . showString ","  . showsPrec 7 t2
+  showsPrec p (TyList t) = showParen (p > 7) $ showString "list " . showsPrec 7 t
+  showsPrec p (TyAll us t) = showString "forall" . showList us . showsPrec (p + 1) t 
+  
 
 -- instance Show Type where
 --   showsPrec _ (TyVar n) = showString ("v" ++ show n)
@@ -99,13 +127,13 @@ emptyEnv :: Env
 emptyEnv = Map.empty
 
 fVar :: Term -> Set Name
-fVar (TmLit _)          = empty
-fVar (TmVar x)          = singleton x
-fVar (TmApp e1 e2)      = fVar e1 `union` fVar e2
-fVar (TmAbs x e0)       = delete x (fVar e0)
-fVar (TmRec x e0)       = delete x (fVar e0)
+fVar (TmLit _)     = empty
+fVar (TmVar x)     = singleton x
+fVar (TmApp e1 e2) = fVar e1 `union` fVar e2
+fVar (TmAbs x e0)  = delete x (fVar e0)
+fVar (TmRec x e0)  = delete x (fVar e0)
 fVar (TmLet x e t) = fVar (TmApp (TmAbs x t) e)
-fVar (TmConst _)        = empty
+fVar (TmConst _)   = empty
 
 
 data Error = UnifyErr UnifyError|TypeError String|SpcErr String|MiscErr String|Impossible

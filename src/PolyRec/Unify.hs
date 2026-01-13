@@ -34,13 +34,13 @@ unifyVar u ty
 unify :: MonadFail m => [(Tau, Tau)] -> ExceptT Error (TI m) Subst
 unify [] = pure nullSubst
 -- unify ((TyVar x,TyVar y):c')
---   |x < y = let subst = Data.Map.Strict.singleton y (TyVar x) :: Subst in
---                   do {c1 <- unify(map(bimap (apply subst) (apply subst)) c');
---                       pure(c1 `Data.Map.Strict.union` subst)}
---   |x == y = unify c'
---   |otherwise = let subst = Data.Map.Strict.singleton x (TyVar y) :: Subst in
---                   do {c1 <- unify (map(bimap (apply subst) (apply subst)) c');
---                       pure(c1 `Data.Map.Strict.union` subst)} 
+--    |x < y = let subst = Data.Map.Strict.singleton y (TyVar x) :: Subst in
+--                    do {c1 <- unify(map(bimap (apply subst) (apply subst)) c');
+--                        pure(c1 `Data.Map.Strict.union` subst)}
+--    |x == y = unify c'
+--    |otherwise = let subst = Data.Map.Strict.singleton x (TyVar y) :: Subst in
+--                    do {c1 <- unify (map(bimap (apply subst) (apply subst)) c');
+--                        pure(c1 `Data.Map.Strict.union` subst)} 
 unify ((TyVar x, t):c')
   |t == TyVar x = unify c'
   |occursCheck x t = throwError $ UnifyErr ECircular

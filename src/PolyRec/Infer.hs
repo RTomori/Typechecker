@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE Strict #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 module PolyRec.Infer (showTyp) where
 
@@ -110,30 +111,38 @@ infer k (TmAbs x e0) = do{
 }
 infer k (TmApp e0 e1) = do{
   (hyp,u0) <- infer k e0;
-  case u0 of
-    TyVar _ -> do{
-      (hyp',u1) <- infer k e1;
-      a1 <- lift $ lift newTyVar;
-      a2 <- lift $ lift newTyVar;
-      s <- lift $ unify $ (TyFun a1 a2,u0):(u1,a1): Data.Map.Strict.elems (Map.intersectionWith (,) hyp' hyp);
-      logDebugN("Substitutions generated:" <> T.show s);
-      let resHyp = hyp `Map.union` hyp' in
-      let res = (Map.map (apply s) resHyp, apply s a2) in do{
-      logDebugN(T.show e0 <> " " <> T.show e1 <> ":"<> T.show res);
-      pure res;
-      }
-    }
-    TyFun u2 u -> do{
-      (hyp',u1) <- infer k e1;
-      s <- lift $ unify ((u1,u2):Data.Map.Strict.elems (Map.intersectionWith (,) hyp' hyp));
-      logDebugN("Substitutions generated:" <> T.show s);
-      let resHyp = hyp `Map.union` hyp' in
-      let res = (Map.map (apply s) resHyp, apply s u) in do{
-        logDebugN(T.show e0 <> " " <> T.show e1 <> ":" <> T.show res);
-        pure (Map.map (apply s) resHyp, apply s u);
-        }
-    }
-    _ -> throwError $ TypeError "Applicand must be either a variable or an abstraction"
+   case u0 of
+     TyVar _ -> do{
+       (hyp',u1) <- infer k e1;
+       a1 <- lift $ lift newTyVar;
+       a2 <- lift $ lift newTyVar;
+       s <- lift $ unify $ (u1,a1):(u0,TyFun a1 a2): Data.Map.Strict.elems (Map.intersectionWith (,) hyp hyp');
+       logDebugN("Substitutions generated:" <> T.show s);
+       let resHyp = hyp' `Map.union` hyp in
+       let res = (Map.map (apply s) resHyp, apply s a2) in do{
+       logDebugN(T.show e0 <> " " <> T.show e1 <> ":"<> T.show res);
+       pure res;
+       }
+     }
+     TyFun u2 u -> do{
+       (hyp',u1) <- infer k e1;
+       s <- lift $ unify ((u1,u2):Data.Map.Strict.elems (Map.intersectionWith (,) hyp hyp'));
+       logDebugN("Substitutions generated:" <> T.show s);
+       let resHyp = hyp' `Map.union` hyp in
+       let res = (Map.map (apply s) resHyp, apply s u) in do{
+         logDebugN(T.show e0 <> " " <> T.show e1 <> ":" <> T.show res);
+         pure (Map.map (apply s) resHyp, apply s u);
+         }
+     }
+    -- (hyp',u1) <- infer k e1;
+    -- a <- lift . lift $ newTyVar;
+    -- s <- lift $ unify $ (u0,TyFun u1 a): Data.Map.Strict.elems(Map.intersectionWith (,) hyp hyp');
+    -- logDebugN("Substitutions generated: " <> T.show s);
+    -- let resHyp = hyp' `Map.union` hyp in
+    -- let res = (Map.map (apply s) resHyp, apply s a) in do{
+    --   logDebugN(T.show e0 <> " " <> T.show e1 <> ":" <> T.show res);
+    --   pure res;
+     _ -> throwError $ TypeError "Applicand must be either a variable or an abstraction"
 }
 infer _ (TmLit (LInt _)) = pure (Map.empty, TyCon TyInt)
 infer _ (TmLit (LBool _)) = pure (Map.empty, TyCon TyBool)
@@ -142,6 +151,7 @@ infer k (TmRec x e0) =
     (ask >>= \env -> fst <$> runStateT (inferRec k x e0) (0, t0 env (TmRec x e0)))
     (const $
       do{
+        lift $ put 0;
         (env,u) <- infer k e0;
         case Map.lookup x env of
           Nothing -> throwError $ TypeError "rec-bound parameter is also bound in body"
@@ -198,21 +208,23 @@ t0 env e0 = let fvar = fVar e0
                 vrange =  Map.foldr' (\(u,_) ns -> Data.Map.Strict.keysSet u `union` ns) Set.empty env
                 vars = (fvar Set.\\ dom) `union` vrange
                 n = Set.size vars
-                tyVars = Prelude.map TyVar [1..n] in (Data.Map.Strict.fromList $ zip (toList vars) tyVars, TyVar (n + 1))
+                tyVars = Prelude.map TyVar [1..n] in (Data.Map.Strict.fromList $ zip (toList vars) tyVars, TyVar 0)
 
 
 
-showTyp' :: (MonadIO m,MonadLogger m,MonadFail m) => Int -> Term -> TI m (Env,Typing)
+showTyp' :: (MonadIO m,MonadLogger m,MonadFail m) => Int -> Term -> TI m (Env,Either Error Typing)
 showTyp' n t = do{
   res <- runExceptT $ runStdoutLoggingT (infer n t);
   env <- ask;
-  case res of
-    Left err -> fail $ show err
-    Right ty -> pure (env,ty)
+  -- catchError (pure(env,ty)) _
+  -- case res of
+  pure(env,res)
+    -- Left err -> _ 
+    -- Right ty -> pure (env,ty)
 }
 -- | This function infers types for given recursion limit, given term and type environment.
 -- 
-showTyp :: (MonadLogger m,MonadFail m,MonadIO m) => Int -> Env -> Term -> m (Env,Typing)
+showTyp :: (MonadLogger m,MonadFail m,MonadIO m) => Int -> Env -> Term -> m (Env,Either Error Typing)
 showTyp n env t = fst <$> runInfer (showTyp' n t) env 0
 
 -- | Examples of basic terms. Intended for testing
