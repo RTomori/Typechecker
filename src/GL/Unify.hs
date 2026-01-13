@@ -40,13 +40,7 @@ unify ((TyVar x, t):c')
                 do
                   c1 <- unify (map (bimap (apply subst) (apply subst)) c')
                   pure (c1 `Data.Map.Strict.union` subst)
-unify ((s, TyVar x):c')
-  |s == TyVar x = unify c'
-  |occursCheck x s = throwError $ UnifyErr ECircular
-  |otherwise = let subst = Data.Map.Strict.singleton x s :: Subst in
-     do
-         c1 <- unify (map (bimap (apply subst) (apply subst)) c')
-         pure (c1 `Data.Map.Strict.union` subst)
+unify ((s, TyVar x):c') = unify((TyVar x, s):c')
 unify ((TyFun s1 s2,TyFun t1 t2):c') = unify (c'++[(s1,t1),(s2,t2)])
 unify ((TyProd s1 s2,TyProd t1 t2):c') = unify (c'++[(s1,t1),(s2,t2)])
 unify ((TyCon c1, TyCon c2):c') =
