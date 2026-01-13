@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Strict            #-}
 {-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE Strict #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 module PolyRec.Infer (showTyp) where
 
@@ -19,7 +19,7 @@ import qualified Data.Map.Strict        as Map (delete, empty, foldr', fromList,
                                                 singleton, size, union)
 import           Data.Set
 import qualified Data.Set               as Set (empty, size, (\\))
-import qualified Data.Text              as T
+import qualified Data.Text              as T (pack, show)
 import           PolyRec.Monad          (TI, extendEnv, newTyVar, runInfer)
 import           PolyRec.Subst
 import           PolyRec.Syntax
@@ -170,7 +170,7 @@ infer k (TmLet x e1 e2) = do{
     Left err -> throwError err
     Right ty -> pure ty
 }
--- | Inference algorithm for rec-bound terms. 
+-- | Inference algorithm for rec-bound terms.
 inferRec :: (MonadLogger m,MonadFail m,MonadIO m) =>
                        Int ->
                        Name ->
@@ -208,7 +208,7 @@ t0 env e0 = let fvar = fVar e0
                 vrange =  Map.foldr' (\(u,_) ns -> Data.Map.Strict.keysSet u `union` ns) Set.empty env
                 vars = (fvar Set.\\ dom) `union` vrange
                 n = Set.size vars
-                tyVars = Prelude.map TyVar [1..n] in (Data.Map.Strict.fromList $ zip (toList vars) tyVars, TyVar 0)
+                tyVars = Prelude.map TyVar [0..(n-1)] in (Data.Map.Strict.fromList $ zip (toList vars) tyVars, TyVar n)
 
 
 
@@ -219,52 +219,11 @@ showTyp' n t = do{
   -- catchError (pure(env,ty)) _
   -- case res of
   pure(env,res)
-    -- Left err -> _ 
+    -- Left err -> _
     -- Right ty -> pure (env,ty)
 }
 -- | This function infers types for given recursion limit, given term and type environment.
--- 
+--
 showTyp :: (MonadLogger m,MonadFail m,MonadIO m) => Int -> Env -> Term -> m (Env,Either Error Typing)
 showTyp n env t = fst <$> runInfer (showTyp' n t) env 0
 
--- | Examples of basic terms. Intended for testing
-i :: Term
-i = TmAbs "x" (TmVar "x")
-
-k :: Term
-k = TmAbs "x" (TmAbs "y" (TmVar "x"))
-
-s :: Term
-s = TmAbs "x" (TmAbs "y"(TmAbs "z" (TmApp (TmApp (TmVar "x") (TmVar "z")) (TmApp (TmVar "y") (TmVar "z")))))
-example :: Term
-example = TmRec "f" (TmAbs "g" (TmAbs "y" (TmApp (TmApp (TmApp (TmConst Ifc) (TmLit (LBool False))) (TmVar "y")) (TmApp (TmVar "g") (TmApp (TmApp (TmVar "f") (TmVar "g")) (TmVar "y"))))))
-
-example2 :: Term
-example2 = TmRec "f" (TmAbs "g" (TmAbs "h1" (TmAbs "y" (TmApp (TmApp (TmApp (TmConst Ifc) (TmLit (LBool False))) (TmVar "y")) (TmApp (TmVar "g") (TmApp (TmApp (TmApp (TmVar "f") (TmVar "g")) (TmVar "h1")) (TmApp (TmApp (TmApp (TmVar "f") (TmVar "h1")) (TmVar "g")) (TmVar "y"))))))))
-
-
-example2Body :: Term
-example2Body = TmAbs "g" (TmAbs "h1" (TmAbs "y" (TmApp (TmApp (TmApp (TmConst Ifc) (TmLit (LBool False))) (TmVar "y")) (TmApp (TmVar "g") (TmApp (TmApp (TmApp (TmVar "f") (TmVar "g")) (TmVar "h1")) (TmApp (TmApp (TmApp (TmVar "f") (TmVar "h1")) (TmVar "g")) (TmVar "y")))))))
-
-example3 :: Term
-example3 = TmRec "g" (TmAbs "x" (TmApp (TmConst Plus)(TmApp (TmApp (TmConst Pair) (TmApp (TmVar "g") (TmLit (LInt 2)))) (TmApp (TmVar "g") (TmLit (LBool False))))))
-
-foldN :: Term
-foldN = TmAbs "h"
-          (TmAbs "c"
-            (TmRec "f"
-              (TmAbs "n"
-                (TmApp
-                  (TmApp
-                    (TmApp (TmConst Ifc)
-                      (TmApp (TmApp (TmConst Equiv) (TmVar "n"))
-                      (TmLit (LInt 0)))) (TmVar "c"))
-                      (TmApp (TmVar "h") (TmApp (TmVar "f") (TmApp (TmApp (TmConst Minus) (TmVar "n")) (TmLit (LInt 1)))))))))
-example4 :: Term
-example4 = TmRec "f" (TmAbs "x" (TmApp (TmAbs "y" (TmLit (LBool True))) (TmApp (TmConst Not) (TmApp (TmVar "f") (TmLit (LBool False))))))
-example5 :: Term
-example5 = TmRec "g" (TmAbs "x" (TmApp (TmConst Plus) (TmApp (TmApp (TmConst Pair) (TmApp (TmVar "g") (TmLit (LInt 2)))) (TmApp (TmVar "g") (TmLit (LBool False))))))
-body :: Term -> Term
-body (TmAbs _ e) = body e
-body (TmRec _ e) = body e
-body e           = e

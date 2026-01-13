@@ -97,7 +97,7 @@ packages:
     hackage: text-2.1.3
 snapshots:
 - completed:
-    sha256: 00ba22708cdb7615bf811b01e43eb82aae8a615d3bf5b2b0056ffbbecabe6506
-    size: 705114
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/11/1.yaml
-  original: nightly-2025-11-01
+    sha256: 72cdd5851794184138551f43f0897c28f1a5acdda303b266aa9e910461103b3c
+    size: 726784
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/28.yaml
+  original: lts-24.28

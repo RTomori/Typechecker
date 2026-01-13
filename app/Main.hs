@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 import           Data.Text                
-import qualified Data.Text                (show)
 import           PolyRec.Infer                    (showTyp)
 import PolyRec.Lexer 
 import           System.Console.Haskeline (InputT, defaultSettings,
