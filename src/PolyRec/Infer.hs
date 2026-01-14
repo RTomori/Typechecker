@@ -74,7 +74,10 @@ infer _ (TmVar x) = do
     Just typ@(hyp,res) -> let size = Map.size env in let sub = substOfTyp typ in
       do{
       put (size + 1);
-      pure (Map.map (apply sub) hyp, apply sub res);
+      let ty = (Map.map (apply sub) hyp, apply sub res) in do{
+        logDebugN(T.show x <> T.pack ":" <> T.show ty);
+        pure ty;
+      };
     }
     Nothing -> do{
       a <- lift $ lift newTyVar;
@@ -134,14 +137,6 @@ infer k (TmApp e0 e1) = do{
          pure (Map.map (apply s) resHyp, apply s u);
          }
      }
-    -- (hyp',u1) <- infer k e1;
-    -- a <- lift . lift $ newTyVar;
-    -- s <- lift $ unify $ (u0,TyFun u1 a): Data.Map.Strict.elems(Map.intersectionWith (,) hyp hyp');
-    -- logDebugN("Substitutions generated: " <> T.show s);
-    -- let resHyp = hyp' `Map.union` hyp in
-    -- let res = (Map.map (apply s) resHyp, apply s a) in do{
-    --   logDebugN(T.show e0 <> " " <> T.show e1 <> ":" <> T.show res);
-    --   pure res;
      _ -> throwError $ TypeError "Applicand must be either a variable or an abstraction"
 }
 infer _ (TmLit (LInt _)) = pure (Map.empty, TyCon TyInt)
@@ -161,6 +156,7 @@ infer k (TmRec x e0) =
             pure (Map.map (apply s) env', apply s u)
           }
       })
+-- Won't type nested lets. Type schemes required? 
 infer k (TmLet x e1 e2) = do{
   ty0 <- infer k e1;
   -- put 0;
@@ -186,7 +182,6 @@ inferRec k x e0 = do{
           case typ of
             Left _ -> pure typ'
             Right t -> catchError (do{lift . lift $ spc t typ';pure typ'})(\e -> do{logDebugN (T.show e); put(h + 1,t); inferRec k x e0})
-                --do{put (1,t1); inferRec k x e0}
         }
         |h <= k-> do{
           typ <- lift .lift . lift $ extendEnv x typ' (runExceptT (runStdoutLoggingT $ infer k e0));
@@ -194,8 +189,6 @@ inferRec k x e0 = do{
           case typ of
               Left _ -> pure typ'
               Right t -> catchError (do{lift .lift $ spc t typ'; pure typ'})(\e -> do{logDebugN(T.show e);catchError(do{lift . lift $ spc typ' t; pure t}) (\e -> do{logDebugN(T.show e);put(h + 1,t); inferRec k x e0})});
-              --(\e ->  (do{put (h +1, t); inferRec k x e0}))
-              --(do{lift $ spc t typ'; pure t})
 
         }
         |otherwise -> throwError $ TypeError "failed to find principal typing within given recursion limit"
@@ -208,7 +201,7 @@ t0 env e0 = let fvar = fVar e0
                 vrange =  Map.foldr' (\(u,_) ns -> Data.Map.Strict.keysSet u `union` ns) Set.empty env
                 vars = (fvar Set.\\ dom) `union` vrange
                 n = Set.size vars
-                tyVars = Prelude.map TyVar [0..(n-1)] in (Data.Map.Strict.fromList $ zip (toList vars) tyVars, TyVar n)
+                tyVars = Prelude.map TyVar [1..n] in (Data.Map.Strict.fromList $ zip (toList vars) tyVars, TyVar (n+1))
 
 
 
@@ -216,11 +209,7 @@ showTyp' :: (MonadIO m,MonadLogger m,MonadFail m) => Int -> Term -> TI m (Env,Ei
 showTyp' n t = do{
   res <- runExceptT $ runStdoutLoggingT (infer n t);
   env <- ask;
-  -- catchError (pure(env,ty)) _
-  -- case res of
   pure(env,res)
-    -- Left err -> _
-    -- Right ty -> pure (env,ty)
 }
 -- | This function infers types for given recursion limit, given term and type environment.
 --

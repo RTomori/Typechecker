@@ -85,7 +85,12 @@ Atom : '(' Expr ')' { $2 }
      | snd Atom { TmApp (TmConst Snd) $2 }
      | hd Atom { TmApp (TmConst Hd) $2 }
      | tl Atom { TmApp (TmConst Tl) $2 }
+     | '[' ListExpr ']' { $2 }
      | '(' Expr ',' Expr ')' { TmApp (TmApp (TmConst Pair) $2) $4 }
+
+ListExpr : {- if empty -}  { TmConst Nil }
+         | Atom { TmApp(TmApp (TmConst Cons) $1) (TmConst Nil) }
+         | Atom ',' ListExpr { TmApp (TmApp (TmConst Cons) $1) $3 }
 {
 parseError :: Token -> Alex a
 parseError _ = do{
