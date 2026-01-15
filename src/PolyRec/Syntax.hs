@@ -101,7 +101,7 @@ instance Show Type where
   showsPrec p (TyCon TyInt) = showString "int"
   showsPrec p (TyCon TyBool) = showString "bool"
   showsPrec p (TyFun t1 t2) = showParen (p > 6) $ showsPrec 7 t1 . showString "->" . showsPrec 6 t2
-  showsPrec p (TyProd t1 t2) = showParen (p > 6) $ showsPrec 7 t1 . showString ","  . showsPrec 7 t2
+  showsPrec p (TyProd t1 t2) = showParen True $ showsPrec 15 t1 . showString ","  . showsPrec 15 t2
   showsPrec p (TyList t) = showParen (p > 7) $ showString "list " . showsPrec 7 t
   showsPrec p (TyAll us t) = showString "forall" . showList us . showsPrec (p + 1) t 
   

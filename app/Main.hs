@@ -30,6 +30,7 @@ main = do{
       case minput of
         Nothing -> pure ()
         Just "quit" -> pure ()
+        Just "help" -> pure()
         Just input -> do{
           -- let p = parse parseAExp "" (pack input) in
           -- case p of
@@ -39,10 +40,10 @@ main = do{
             case parseTerm $ pack input of
               Left err -> do{outputStrLn err; loop k}
               Right tm -> do{
-                outputStrLn $ "Obtained AST:" ++ Prelude.show tm;
                 outputStrLn "";
                 typ <- runStderrLoggingT $ showTyp k emptyEnv tm;
-                outputStrLn (Prelude.show (fst typ) ++ "|-" ++ Prelude.show tm ++ ":" ++ Prelude.show (snd typ)); loop k;
+                outputStrLn (Prelude.show (fst typ) ++ "|-" ++ Prelude.show tm ++ ":" ++ Prelude.show (snd typ)); 
+                outputStrLn "";loop k;
             -- inferType k a >>= \t -> outputStrLn $ "|-" ++ show t;
 }
 }

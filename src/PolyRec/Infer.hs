@@ -16,7 +16,7 @@ import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        (delete, elems, fromList, keysSet, (!))
 import qualified Data.Map.Strict        as Map (delete, empty, foldr', fromList,
                                                 intersectionWith, lookup, map,
-                                                singleton, size, union)
+                                                singleton, size, union,elems)
 import           Data.Set
 import qualified Data.Set               as Set (empty, size, (\\))
 import qualified Data.Text              as T (pack, show)
@@ -60,7 +60,9 @@ spc :: (MonadLogger m,MonadFail m) => Typing -> Typing -> ExceptT Error (TI m) (
 spc t0@(env0,ty0) t1@(env1,ty1) = do{
   s <-  unify ((ty0,ty1):Data.Map.Strict.elems (Map.intersectionWith (,) env0 env1));
   logDebugN("Substitutions generated for specialisation:" <> T.show s);
-  let  ty0' = apply s ty0 in unless (ty0' == ty1 && Map.map (apply s) env0 == Map.map (apply s) env1) (throwError (SpcErr (show t0 ++ " does not specialize to " ++ show t1))) }
+  let  ty0' = apply s ty0 in
+  let env1' = Map.map(apply s) env1
+          in unless (ty0' == ty1 && env0== env1' && Map.size s == 0) (throwError (SpcErr (show t0 ++ " does not specialize to " ++ show t1))) }
 
 -- | The main inference algorithm. It either calculates principal typing for given term or
 -- raises exception if it fails, while producing inference traces to standard output.
@@ -75,14 +77,14 @@ infer _ (TmVar x) = do
       do{
       put (size + 1);
       let ty = (Map.map (apply sub) hyp, apply sub res) in do{
-        logDebugN(T.show x <> T.pack ":" <> T.show ty);
+        -- logDebugN(T.show x <> T.pack ":" <> T.show ty);
         pure ty;
       };
     }
     Nothing -> do{
       a <- lift $ lift newTyVar;
       let ty=  (Map.singleton x a,a) in do{
-        logDebugN(T.show x <> T.pack ":" <> T.show ty);
+        -- logDebugN(T.show x <> T.pack ":" <> T.show ty);
         pure ty;
       }
     }
@@ -93,7 +95,7 @@ infer _ (TmConst c) =
       let s = newSubst ns tvs in
       let res = (Map.empty,apply s ty) :: (Map Name Tau, Tau) in
       do{
-        logDebugN(T.show c <> ":" <> T.show res);
+        -- logDebugN(T.show c <> ":" <> T.show res);
         pure res}}
     ty         -> pure (Map.empty,ty)
 infer k (TmAbs x e0) = do{
@@ -102,13 +104,13 @@ infer k (TmAbs x e0) = do{
   then do{
     case Map.lookup x hyp of
       Just u  -> let res = (Data.Map.Strict.delete x hyp, TyFun u u0) in do{
-        logDebugN(T.show (TmAbs x e0) <> ": "<> T.show res);
+        -- logDebugN(T.show (TmAbs x e0) <> ": "<> T.show res);
         pure (Data.Map.Strict.delete x hyp, TyFun u u0)}
       Nothing -> throwError Impossible
   }
   else do{
     a <- lift $ lift newTyVar;
-    logDebugN(T.show (TmAbs x e0) <> ":" <> T.show(hyp,TyFun a u0));
+    -- logDebugN(T.show (TmAbs x e0) <> ":" <> T.show(hyp,TyFun a u0));
     pure (hyp, TyFun a u0)
   }
 }
@@ -120,20 +122,20 @@ infer k (TmApp e0 e1) = do{
        a1 <- lift $ lift newTyVar;
        a2 <- lift $ lift newTyVar;
        s <- lift $ unify $ (u1,a1):(u0,TyFun a1 a2): Data.Map.Strict.elems (Map.intersectionWith (,) hyp hyp');
-       logDebugN("Substitutions generated:" <> T.show s);
+       -- logDebugN("Substitutions generated:" <> T.show s);
        let resHyp = hyp' `Map.union` hyp in
        let res = (Map.map (apply s) resHyp, apply s a2) in do{
-       logDebugN(T.show e0 <> " " <> T.show e1 <> ":"<> T.show res);
+       -- logDebugN(T.show e0 <> " " <> T.show e1 <> ":"<> T.show res);
        pure res;
        }
      }
      TyFun u2 u -> do{
        (hyp',u1) <- infer k e1;
        s <- lift $ unify ((u1,u2):Data.Map.Strict.elems (Map.intersectionWith (,) hyp hyp'));
-       logDebugN("Substitutions generated:" <> T.show s);
+       -- logDebugN("Substitutions generated:" <> T.show s);
        let resHyp = hyp' `Map.union` hyp in
        let res = (Map.map (apply s) resHyp, apply s u) in do{
-         logDebugN(T.show e0 <> " " <> T.show e1 <> ":" <> T.show res);
+         -- logDebugN(T.show e0 <> " " <> T.show e1 <> ":" <> T.show res);
          pure (Map.map (apply s) resHyp, apply s u);
          }
      }
@@ -181,14 +183,15 @@ inferRec k x e0 = do{
           logDebugN(T.show typ);
           case typ of
             Left _ -> pure typ'
-            Right t -> catchError (do{lift . lift $ spc t typ';pure typ'})(\e -> do{logDebugN (T.show e); put(h + 1,t); inferRec k x e0})
+            Right t -> catchError (do{lift . lift $ spc t typ';pure typ'})(\e -> do{put(h + 1,t); inferRec k x e0})
         }
-        |h <= k-> do{
+        |h <= k -> do{
           typ <- lift .lift . lift $ extendEnv x typ' (runExceptT (runStdoutLoggingT $ infer k e0));
           logDebugN(T.show typ);
           case typ of
-              Left _ -> pure typ'
-              Right t -> catchError (do{lift .lift $ spc t typ'; pure typ'})(\e -> do{logDebugN(T.show e);catchError(do{lift . lift $ spc typ' t; pure t}) (\e -> do{logDebugN(T.show e);put(h + 1,t); inferRec k x e0})});
+              Left err -> throwError err
+              Right t -> catchError (do{lift .lift $ spc t typ'; pure typ'})
+                                    (\e -> do{catchError(do{lift . lift $ spc typ' t;pure t}) (\e -> do{put(h + 1,t); inferRec k x e0})});
 
         }
         |otherwise -> throwError $ TypeError "failed to find principal typing within given recursion limit"
