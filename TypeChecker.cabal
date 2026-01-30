@@ -27,11 +27,6 @@ source-repository head
 
 library
   exposed-modules:
-      GL.Infer
-      GL.Monad
-      GL.Subst
-      GL.Syntax
-      GL.Unify
       PolyRec.Infer
       PolyRec.Lexer
       PolyRec.Monad

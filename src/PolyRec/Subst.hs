@@ -20,4 +20,4 @@ apply s (TyList t)       = TyList $ apply s t
 apply s (TyProd ty1 ty2) = TyProd (apply s ty1) (apply s ty2)
 
 compose :: Subst -> Subst -> Subst
-compose s1 s2 = s1 `Map.union` Map.map (apply s2) s1
+compose s1 s2 = Map.map (apply s1) s2 `Map.union` s1

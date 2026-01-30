@@ -4,4 +4,6 @@ cabal-dev
 *.o
 .hpc
 .DS_Store
-.vscode
+.vscode/
+.claude/
+*.pdf

@@ -18,6 +18,7 @@ import PolyRec.Lexer (Token(..),Alex,AlexPosn(AlexPn),alexMonadScan,alexError,al
 	if {TokenIf}
 	then {TokenThen}
 	else {TokenElse}
+    null {TokenNull}
 	hd {TokenHd }
 	tl {TokenTl}
 	fst {TokenFst}
@@ -44,18 +45,21 @@ import PolyRec.Lexer (Token(..),Alex,AlexPosn(AlexPn),alexMonadScan,alexError,al
 	'[' {TokenLSqBrack }
 	']' {TokenRSqBrack}
 	',' {TokenComma }
+    ':' {TokenColon}
 
 %right in
 %left '&&' '||'
 %right not
 %left '<' '=='
 %left '+' '-'
-%right '*'
+%right '*' ':'
 %%
 
 Expr : let var '=' Expr in Expr { TmLet $2 $4 $6 }
+     | let rec var Vars '=' Expr in Expr { TmLet $3 (TmRec $3 (foldr (\x e -> TmAbs x e) $6 $4)) $8 }
      | fun Vars '->' Expr { foldr (\x e -> TmAbs x e) $4 $2 }
      | if Expr then Expr else Expr { TmApp (TmApp (TmApp (TmConst Ifc) $2) $4) $6 }
+     | Atom ':' Expr {TmApp (TmApp (TmConst Cons) $1) $3 }
 	 | rec '{' var '=' Expr '}' { TmRec $3 $5 }
 	 | Form { $1 }
 
@@ -85,6 +89,7 @@ Atom : '(' Expr ')' { $2 }
      | snd Atom { TmApp (TmConst Snd) $2 }
      | hd Atom { TmApp (TmConst Hd) $2 }
      | tl Atom { TmApp (TmConst Tl) $2 }
+     | null Atom {TmApp (TmConst Null) $2 }
      | '[' ListExpr ']' { $2 }
      | '(' Expr ',' Expr ')' { TmApp (TmApp (TmConst Pair) $2) $4 }
 

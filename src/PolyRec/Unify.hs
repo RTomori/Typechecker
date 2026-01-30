@@ -4,7 +4,7 @@ import           Data.Bifunctor            (Bifunctor (bimap))
 import qualified Data.Map.Strict           (singleton,union)
 import qualified Data.Set                  as Set
 import           PolyRec.Monad                     (TI(runInfer))
-import           PolyRec.Subst                     (Subst, apply, nullSubst)
+import           PolyRec.Subst                     (Subst, apply, nullSubst,compose)
 import           PolyRec.Syntax                    (Tau,emptyEnv,
                                             Type (TyAll, TyCon, TyFun, TyList, TyProd, TyVar),TyCon(TyBool,TyInt),
                                             Uniq, Error(UnifyErr),UnifyError(ECircular,EUnsolvable,EInfty))
@@ -47,20 +47,20 @@ unify ((TyVar x, t):c')
   |otherwise =  let subst = Data.Map.Strict.singleton x t ::Subst in
                 do
                   c1 <- unify (map (bimap (apply subst) (apply subst)) c')
-                  pure (c1 `Data.Map.Strict.union` subst)
-unify ((s, TyVar x):c') = unify((TyVar x, s):c')
-  -- |s == TyVar x = unify c'
-  -- -- |occursCheck x s = throwError $ UnifyErr ECircular
-  -- |otherwise = let subst = Data.Map.Strict.singleton x s :: Subst in
-  --    do
-  --        c1 <- unify (map (bimap (apply subst) (apply subst)) c')
-  --        pure (c1 `Data.Map.Strict.union` subst)
+                  pure (c1 `compose` subst)
+unify ((s, TyVar x):c')  
+  |s == TyVar x = unify c'
+  |occursCheck x s = throwError $ UnifyErr ECircular
+  |otherwise = let subst = Data.Map.Strict.singleton x s :: Subst in
+      do
+       c1 <- unify (map (bimap (apply subst) (apply subst)) c');
+       pure (c1 `compose` subst)
 unify ((TyFun s1 s2,TyFun t1 t2):c') = unify (c'++[(s1,t1),(s2,t2)])
 unify ((TyProd s1 s2,TyProd t1 t2):c') = unify (c'++[(s1,t1),(s2,t2)])
 unify ((TyCon c1, TyCon c2):c') =
   if c1 == c2 then unify c'
   else throwError $ UnifyErr EUnsolvable
-unify ((TyList t1, TyList t2):c') = unify (c'++[(t1,t2)])
+unify ((TyList t1, TyList t2):c') = unify (c' ++ [(t1,t2)])
 unify ((_, _):_) = throwError $ UnifyErr EUnsolvable
 
 runUnify' xs = do{

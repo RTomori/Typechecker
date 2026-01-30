@@ -35,8 +35,8 @@ instance MonadFail m => MonadFail (TI m) where
                     e' <- fail err;
                     pure (e', uq)})
 
-instance Monad m => MonadLogger (TI m) where
-  monadLoggerLog _ _ _ _ = TI(\_ n -> pure ((),n))
+instance MonadLogger m => MonadLogger (TI m) where
+  monadLoggerLog loc src lvl msg = lift $ monadLoggerLog loc src lvl msg
 
 instance MonadIO m => MonadIO (TI m) where
   liftIO = lift . liftIO

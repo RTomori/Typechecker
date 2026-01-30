@@ -10,6 +10,7 @@ module PolyRec.Syntax
     Lit (LInt, LBool),
     Tau,
     Sigma,
+    Scheme (Forall),
     Typing,
     Env,
     consts,
@@ -34,7 +35,7 @@ data Const =
 
 consts :: Map Const Type
 consts = Map.fromList [
-  (Nil, TyAll [0] (TyList (TyVar 0))),
+  (Nil,  TyAll [0] (TyList (TyVar 0))),
   (Not, TyFun (TyCon TyBool) (TyCon TyBool)),
   (And, TyFun (TyProd (TyCon TyBool) (TyCon TyBool)) (TyCon TyBool)),
   (Or, TyFun (TyProd (TyCon TyBool) (TyCon TyBool)) (TyCon TyBool)),
@@ -48,7 +49,7 @@ consts = Map.fromList [
   (Null, TyAll [0] (TyFun (TyList (TyVar 0)) (TyCon TyBool))),
   (Hd, TyAll [0] (TyFun (TyList (TyVar 0)) (TyVar 0))),
   (Tl, TyAll [0] (TyFun (TyList (TyVar 0)) (TyList (TyVar 0)))),
-  (Pair, TyAll [0,1] (TyFun (TyVar 0) (TyFun (TyVar 1) (TyProd (TyVar 0) (TyVar 1))))),
+  (Pair,  TyAll [0,1] (TyFun (TyVar 0) (TyFun (TyVar 1) (TyProd (TyVar 0) (TyVar 1))))),
   (Cons, TyAll [0] (TyFun (TyVar 0) (TyFun (TyList (TyVar 0))(TyList (TyVar 0))))),
   (Ifc,TyAll [0] (TyFun (TyCon TyBool) (TyFun (TyVar 0) (TyFun (TyVar 0) (TyVar 0)))))]
 
@@ -79,9 +80,9 @@ instance Show Term where
   -- showsPrec p (TmRec x t) = showString "fix " . showsPrec p x . showString "." . showsPrec p t
   -- showsPrec p (TmLet x t1 t2) = showString "let " . showsPrec p x . showString " = " .showsPrec p t1 . showString " in " . showsPrec p t2
   -- showsPrec _ (TmConst c) = showString $ show c
-  showsPrec p (TmLit x) = showString $ show x
-  showsPrec p (TmVar x) = showString x
-  showsPrec p (TmApp t1 t2) = showParen (p > 6) $ showsPrec 6 t1 . showString " " . showsPrec 7 t2
+  showsPrec _ (TmLit x) = showString $ show x
+  showsPrec _ (TmVar x) = showString x
+  showsPrec p (TmApp t1 t2) = showParen (p > 6) $ showsPrec 7 t1 . showString " " . showsPrec 8 t2
   showsPrec p (TmAbs x t) = showParen (p > 6) $ showString "fun " . showsPrec 7 x . showString "." . showsPrec 6 t
   showsPrec p (TmRec x t) = showParen (p > 6) $ showString "rec" . showsPrec 7 x . showString "." . showsPrec 6 t
   showsPrec p (TmLet x t1 t2) = showString "let " . showsPrec p x . showString " = " . showsPrec p t1 . showString " in " . showsPrec p t2
@@ -97,23 +98,28 @@ data Type where
   deriving (Eq)
 
 instance Show Type where
-  showsPrec p (TyVar x) = showString "v" .showsPrec 11 x
-  showsPrec p (TyCon TyInt) = showString "int"
-  showsPrec p (TyCon TyBool) = showString "bool"
+  showsPrec _ (TyVar x) = showString "v" .showsPrec 11 x
+  showsPrec _ (TyCon TyInt) = showString "int"
+  showsPrec _ (TyCon TyBool) = showString "bool"
   showsPrec p (TyFun t1 t2) = showParen (p > 6) $ showsPrec 7 t1 . showString "->" . showsPrec 6 t2
-  showsPrec p (TyProd t1 t2) = showParen True $ showsPrec 15 t1 . showString ","  . showsPrec 15 t2
+  showsPrec _ (TyProd t1 t2) = showParen True $ showsPrec 15 t1 . showString ","  . showsPrec 15 t2
   showsPrec p (TyList t) = showParen (p > 7) $ showString "list " . showsPrec 7 t
   showsPrec p (TyAll us t) = showString "forall" . showList us . showsPrec (p + 1) t 
   
 
--- instance Show Type where
---   showsPrec _ (TyVar n) = showString ("v" ++ show n)
---   showsPrec _ (TyCon TyInt) = showString "int"
---   showsPrec _ (TyCon TyBool) = showString "bool"
---   showsPrec p (TyFun t1 t2) = showParen _
 type Tau = Type
 
 type Sigma = Type
+
+-- | Type scheme for polymorphic types
+-- Forall quantifies over a list of type variables
+data Scheme where
+  Forall :: [Uniq] -> Type -> Scheme
+  deriving (Eq)
+
+instance Show Scheme where
+  showsPrec p (Forall [] t) = showsPrec p t
+  showsPrec p (Forall us t) = showString "forall " . showList us . showString ". " . showsPrec (p + 1) t
 
 -- simple types, or monomorphic types
 data TyCon = TyInt | TyBool
