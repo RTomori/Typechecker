@@ -73,14 +73,14 @@ data Term where
 type Uniq = Int
 
 instance Show Term where
-  showsPrec :: Int -> Term -> ShowS
-  showsPrec _ (TmLit x) = showString $ show x
-  showsPrec _ (TmVar x) = showString x
-  showsPrec p (TmApp t1 t2) = showParen (p > 6) $ showsPrec 7 t1 . showString " " . showsPrec 8 t2
-  showsPrec p (TmAbs x t) = showParen (p > 6) $ showString "fun " . showsPrec 6 x . showString "." . showsPrec 6 t
-  showsPrec p (TmRec x t) = showParen (p > 6) $ showString "rec" . showsPrec 7 x . showString "." . showsPrec 6 t
-  showsPrec p (TmLet x t1 t2) = showString "let " . showsPrec p x . showString " = " . showsPrec p t1 . showString " in " . showsPrec p t2
-  showsPrec _ (TmConst c) = showString $ show c
+   showsPrec :: Int -> Term -> ShowS
+   showsPrec _ (TmLit x) = showString $ show x
+   showsPrec _ (TmVar x) = showString x
+   showsPrec p (TmApp t1 t2) = showParen (p > 6) $ showsPrec 7 t1 . showString " " . showsPrec 8 t2
+   showsPrec p (TmAbs x t) = showParen (p > 6) $ showString "fun " . showsPrec 6 x . showString "." . showsPrec 6 t
+   showsPrec p (TmRec x t) = showParen (p > 6) $ showString "rec" . showsPrec 7 x . showString "." . showsPrec 6 t
+   showsPrec p (TmLet x t1 t2) = showString "let " . showsPrec p x . showString " = " . showsPrec p t1 . showString " in " . showsPrec p t2
+   showsPrec _ (TmConst c) = showString $ show c
 
 data Type where
   TyVar :: Uniq -> Type

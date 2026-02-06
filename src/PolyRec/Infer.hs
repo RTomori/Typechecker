@@ -165,7 +165,7 @@ infer k (TmRec x e0) =
 infer k (TmLet x e0 e) = do{
   ty0@(a0,_) <- infer k e0;
   i <- get;
-  let e' = termSubst x (TmVar(show i)) e in do{ty <- lift $ extendEnv (show i :: Name) ty0 (runExceptT $ infer k (termSubst x (TmVar (show i)) e));
+  let e' = termSubst x (TmVar("_" <> show i)) e in do{ty <- lift $ extendEnv ("_" <> show i :: Name) ty0 (runExceptT $ infer k (termSubst x (TmVar ("_" <> show i)) e));
   logDebugN (T.show e' <> ":" <> T.show ty);
   case ty of
     Left e -> throwError e
