@@ -23,8 +23,8 @@ import PolyRec.Lexer (Token(..),Alex,AlexPosn(AlexPn),alexMonadScan,alexError,al
 	tl {TokenTl}
 	fst {TokenFst}
 	snd {TokenSnd }
-	True {TokenTrue}
-	False {TokenFalse}
+	true {TokenTrue}
+	false {TokenFalse}
 	int {TokenInt $$}
 	var {TokenSym $$}
 	'->' {TokenArrow  }
@@ -52,14 +52,15 @@ import PolyRec.Lexer (Token(..),Alex,AlexPosn(AlexPn),alexMonadScan,alexError,al
 %right not
 %left '<' '=='
 %left '+' '-'
-%right '*' ':'
+%right '*' 
+%right ':'
 %%
 
 Expr : let var '=' Expr in Expr { TmLet $2 $4 $6 }
      | let rec var Vars '=' Expr in Expr { TmLet $3 (TmRec $3 (foldr (\x e -> TmAbs x e) $6 $4)) $8 }
      | fun Vars '->' Expr { foldr (\x e -> TmAbs x e) $4 $2 }
      | if Expr then Expr else Expr { TmApp (TmApp (TmApp (TmConst Ifc) $2) $4) $6 }
-     | Atom ':' Expr {TmApp (TmApp (TmConst Cons) $1) $3 }
+	 | Atom ':' Expr {TmApp (TmApp (TmConst Cons) $1) $3 }
 	 | rec '{' var '=' Expr '}' { TmRec $3 $5 }
 	 | Form { $1 }
 
@@ -83,8 +84,8 @@ Fact : Fact Atom { TmApp $1 $2 }
 Atom : '(' Expr ')' { $2 }
      | int { TmLit (LInt $1) }
 	 | var { TmVar $1 }
-	 | True { TmLit (LBool True) }
-	 | False { TmLit (LBool False) }
+	 | true { TmLit (LBool True) }
+	 | false { TmLit (LBool False) }
      | fst Atom { TmApp (TmConst Fst) $2 }
      | snd Atom { TmApp (TmConst Snd) $2 }
      | hd Atom { TmApp (TmConst Hd) $2 }

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
-import           Data.Text                
+import           Data.Text (Text,pack)                
 import           PolyRec.Infer                    (showTyp)
 import           System.Console.Haskeline (InputT, defaultSettings,
                                            getInputLine, outputStrLn, runInputT)
@@ -16,7 +16,7 @@ parseTerm s = Lexer.runAlex s Parser.termparser
 main :: IO()
 main = do{
   args <- getArgs;
-  if args == ["-h"] || args == ["--help"] then putStrLn "Typechecker for the decidable fragment of Milner-Mycroft calculus\nAvailable arguments:\n\nAvailable flags:\n-h,--help\tShow this help text.\n-v, --verbose\tPrints out every step of type inference, intended for debugging purposes.\n" else
+  if args == ["-h"] || args == ["--help"] then putStrLn "Typechecker for the decidable fragment of Milner-Mycroft calculus\nAvailable arguments:\n\nAvailable flags:\n-h,--help\tShow this help text.\n-v, --verbose\tPrints out every step of type inference.Intended for debugging purposes.\n" else
   let (verbose, limit) = parseArgs args
   in if verbose
      then runInputT defaultSettings (loop limit True)
@@ -44,7 +44,7 @@ main = do{
                 typ <- if verbose
                        then runStderrLoggingT $ showTyp k emptyEnv tm
                        else runNoLoggingT $ showTyp k emptyEnv tm;
-                outputStrLn (Prelude.show (fst typ) ++ "|-" ++ Prelude.show tm ++ ":" ++ Prelude.show (snd typ));
+                outputStrLn (Prelude.show (fst typ) ++ ":-" ++ Prelude.show tm ++ ":" ++ Prelude.show (snd typ));
                 outputStrLn "";loop k verbose;
 }
 }

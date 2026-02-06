@@ -27,7 +27,7 @@ happyExpList = Happy_Data_Array.listArray (0,209) ([39424,35071,136,32,0,0,32768
 {-# NOINLINE happyExpListPerState #-}
 happyExpListPerState st =
     token_strs_expected
-  where token_strs = ["error","%dummy","%start_termparser","Expr","Form","Vars","Fact","Atom","ListExpr","let","in","rec","if","then","else","null","hd","tl","fst","snd","True","False","int","var","'->'","'&&'","'||'","not","'='","'=='","'<'","fun","'+'","'-'","'*'","'('","')'","'{'","'}'","'['","']'","','","':'","%eof"]
+  where token_strs = ["error","%dummy","%start_termparser","Expr","Form","Vars","Fact","Atom","ListExpr","let","in","rec","if","then","else","null","hd","tl","fst","snd","true","false","int","var","'->'","'&&'","'||'","not","'='","'=='","'<'","fun","'+'","'-'","'*'","'('","')'","'{'","'}'","'['","']'","','","':'","%eof"]
         bit_start = st Prelude.* 44
         bit_end = (st Prelude.+ 1) Prelude.* 44
         read_bit = readArrayBit happyExpList

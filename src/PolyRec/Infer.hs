@@ -15,11 +15,10 @@ import           Data.Map.Strict        (Map)
 import qualified Data.Map.Strict        (delete, elems, fromList, keysSet, (!))
 import qualified Data.Map.Strict        as Map (delete, empty, foldr', fromList,
                                                 intersectionWith, lookup, map,
-                                                singleton, size, union)
+                                                singleton, union)
 import           Data.Set               (Set, difference, empty, fromList,
                                          member, singleton, toList, union)
-import qualified Data.Set               as Set (empty, findMax, size, toList,
-                                                (\\))
+import qualified Data.Set               as Set (empty, size, toList, (\\))
 import qualified Data.Text              as T (pack, show)
 import           PolyRec.Monad          (TI, extendEnv, newTyVar, runInfer)
 import           PolyRec.Subst          (Subst, apply)
@@ -28,7 +27,7 @@ import           PolyRec.Syntax         (Env,
                                          Lit (LBool, LInt), Name, Sigma, Tau,
                                          Term (..), TyCon (TyBool, TyInt),
                                          Type (TyAll, TyCon, TyFun, TyList, TyProd, TyVar),
-                                         Typing, Uniq, consts, fVar)
+                                         Typing, Uniq, consts, fVar, termSubst)
 import           PolyRec.Unify          (unify)
 
 
@@ -44,27 +43,22 @@ freeTyVar (TyList t)       = freeTyVar t
 freeInEnv :: Map Name Sigma -> Set Uniq
 freeInEnv env = mconcat (Prelude.map freeTyVar (Data.Map.Strict.elems env))
 
--- create a new substitution
-
--- Collect all free type variables within typing <U;u>
 ftv :: Typing -> Set Uniq
 ftv (assm,ty) = freeInEnv assm `union` freeTyVar ty
 
 newSubst :: [Uniq] -> [Type] -> Subst
 newSubst = (Map.fromList .) . zip
 
--- -- | Check if the 2nd typing subsumes the 1st, i.e. for given two typings (U1;u1), (U2;u2), it checks if there exists a substitution s s.t. s(U1) = U2 and s(u1) = u2.
+-- | Checks if the 2nd typing subsumes the 1st, i.e. for given two typings (U1;u1), (U2;u2), it checks if there exists a substitution $s$ s.t. s(U1) = U2 and s(u1) = u2.
 spc :: (MonadLogger m,MonadFail m) => Typing -> Typing -> ExceptT Error (TI m) ()
 spc t0@(env0,ty0) t1@(env1,ty1) = do{
   s <-  unify ((ty0,ty1):Data.Map.Strict.elems (Map.intersectionWith (,) env0 env1));
   unless (apply s ty0 == ty1 && apply s ty1 == ty1) (throwError (SpcErr (show t0 ++ " does not specialize to " ++ show t1))) }
 
 
--- | The main inference algorithm. It either calculates principal typing for given term or
--- raises exception if failed, while producing inference traces if logging is enabled(Could be enabled via command-line options)
 infer :: (MonadIO m, MonadFail m, MonadLogger m) =>
          Int
-        -> Term -- the term to calculate typing
+        -> Term
         -> ExceptT Error (TI m) Typing
 infer _ (TmVar x) = do
   env <- ask
@@ -85,16 +79,17 @@ infer _ (TmVar x) = do
         pure ty;
       }
     }
+-- Requires shifting of type variables to avoid clash.
 infer _ (TmConst c) =
   case consts Data.Map.Strict.! c of
-    TyAll ns ty ->
-       do{tvs <- mapM (const. lift $ newTyVar) ns;
+    ty ->
+       let ns = toList $ freeTyVar ty in do{tvs <- mapM (const. lift $ newTyVar) ns;
             let s = newSubst ns tvs in
              let res = (Map.empty,apply s ty) :: (Map Name Tau, Tau) in
              do{
                 logDebugN(T.show c <> ":" <> T.show res);
                pure res}}
-    ty          -> pure (Map.empty,ty)
+
 infer k (TmAbs x e0) = do{
   (hyp, u0) <- infer k e0;
   if Data.Set.member x (fVar e0)
@@ -134,7 +129,6 @@ infer k (TmApp e0 e1) = do{
        logDebugN(T.show e0 <> " " <> T.show e1 <> ":"<> T.show res);
        pure res;
     }}
-    -- Otherwise, if u0 = u2 -> u, typing 
      TyFun u2 u -> do{
        -- put 0;
        (hyp',u1) <- infer k e1;
@@ -148,8 +142,9 @@ infer k (TmApp e0 e1) = do{
      }}
      _ -> throwError $ TypeError "Applicand must be either a variable or an abstraction"
 }
-infer _ (TmLit (LInt _)) = pure (Map.empty, TyCon TyInt)
-infer _ (TmLit (LBool _)) = pure (Map.empty, TyCon TyBool)
+infer _ (TmLit (LInt c)) =
+  let ty = (Map.empty, TyCon TyInt) :: Typing in do{logDebugN (T.show c <> ":" <> T.show ty); pure ty}
+infer _ (TmLit (LBool b)) = let ty = (Map.empty, TyCon TyBool) :: Typing in do{logDebugN (T.show b <> ":" <> T.show ty);pure ty}
 infer k (TmRec x e0) =
   catchError
     (ask >>= \env -> fst <$> runStateT (inferRec k x e0) (1, t0 env (TmRec x e0)))
@@ -166,8 +161,18 @@ infer k (TmRec x e0) =
             pure (Map.map (apply s) env', apply s u)
           }
       })
-infer k (TmLet x e1 e2) = infer k (TmApp (TmAbs x e2) e1)
--- | Inference algorithm for rec-bound terms.
+-- | Numeric values cannot be variables by definition of lexer/scanners
+infer k (TmLet x e0 e) = do{
+  ty0@(a0,_) <- infer k e0;
+  i <- get;
+  let e' = termSubst x (TmVar(show i)) e in do{ty <- lift $ extendEnv (show i :: Name) ty0 (runExceptT $ infer k (termSubst x (TmVar (show i)) e));
+  logDebugN (T.show e' <> ":" <> T.show ty);
+  case ty of
+    Left e -> throwError e
+    Right (a1, v1) -> if member x (fVar e) then pure (a1, v1) else pure (a0  `Map.union` a1, v1)
+}
+}
+-- | Inference algorithm for rec-bound terms,
 inferRec :: (MonadLogger m, MonadFail m, MonadIO m) =>
                        Int ->
                        Name ->
@@ -212,4 +217,5 @@ showTyp' n t = do{
 }
 showTyp :: (MonadLogger m,MonadFail m,MonadIO m) => Int -> Env -> Term -> m (Env,Either Error Typing)
 showTyp n env t = fst <$> runInfer (showTyp' n t) env 0
+
 
