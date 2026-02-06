@@ -1,17 +1,19 @@
 # Typechecker for Milner-Mycroft calculus
 ![build status](https://github.com/RTomori/Typechecker/actions/workflows/haskell.yml/badge.svg)
 
-不動点演算子で束縛された変数の本体での複数の具体化を許すMilner-Mycroft計算の決定可能な断片にHindley-Milner型システムを加えた体系($\vdash_{0}^{k,\rm{ML}}$，[1]pp.7-10)の実装．
+再帰関数の型の本体における複数の具体化を許すMilner-Mycroft計算の決定可能な断片にHindley-Milner型システムを加えた体系($\vdash_{0}^{k,\rm{ML}}$，[1]pp.7-10)の実装．
 
 ## Getting Started
 ### Prerequisites
 + StackまたはCabal
   - ビルドツール．対応するGHCコンパイラ(ver9.4.8)および依存パッケージの導入に使う．
   - [GHCup](https://www.haskell.org/ghcup/)を経由すればインストールできる．
++ happy
+  - パーザジェネレータ．stackなどでインストールする．
 + (optional)alex/happy
-  - 字句解析器/構文解析器ジェネレータ．stackなどでインストールする．
-  - 字句解析器と構文解析器はともに生成済みなので必須ではない．
-  - `src`フォルダにスキャナの定義を置いたままビルドすると, Alexのバグにより既存の正しい`Lexer.hs`とは別の誤ったコードが生成される。そのため，字句解析器の仕様を記述したファイルは`src`ディレクトリの上に退避させてある．
+  - 字句解析器ジェネレータ．stackなどでインストールする．
+  - 字句解析器と生成済みなので必須ではない．
+  - `src`フォルダにスキャナの定義を置いたままビルドすると, Alexのバグにより誤ったコードが生成される。そのため，字句解析器の仕様を記述したファイルは`src`ディレクトリの上に退避させてある．
 ### Installation
 stackを使う場合は，このリポジトリをクローンしたフォルダ内で
 ```
@@ -76,7 +78,7 @@ typechecker> rec{g = fun x -> g 2 + g false}
 [Debug] iteration #2:Right (fromList [],v4->int)
 fromList []|-rec"g".fun "x".Plus ((Pair (g 2)) (g False)):Right (fromList [],v8->int)
 ```
-さきほどの例では，recで束縛された変数`g`の型が本体の2つの出現で相異なる型で具体化される($\tt{int \to int, bool \to int}$)．そのためHindley-Milner型システムで型付け出来ないが，$\vdash_{0}^{k,\rm{ML}}(k\geq 2)$でprincipal typing $\langle\emptyset;\alpha\to \mathtt{int}\rangle$をもつ．以下の例により，それが示される．
+さきほどの例では，recで束縛された変数`g`の型が本体の2つの出現で相異なる型で具体化される($\tt{int \to int, bool \to int}$)．そのためHindley-Milner型システムで型付け出来ないが， $\vdash_{0}^{k,\rm{ML}}(k\geq 2)$ でprincipal typing $\langle\emptyset;\alpha\to \mathtt{int}\rangle$をもつ．以下の例により，それが示される．
 ```
 #繰返し上限を1としたときの実行結果．繰返し上限までに型が収束しないので単相再帰のための規則で型付けされ，単一化に失敗する
 typechecker> rec{g = fun x -> g 2 + g false}
@@ -88,7 +90,7 @@ typechecker>  rec{g = fun x -> g 2 + g false}
 
 fromList []|-rec"g".fun "x".Plus ((Pair (g 2)) (g False)):Right (fromList [],v8->int)
 ```
-let多相は[2]の型付け規則$(\rm{LetPS})$([2]p.416, Fig. 5)によりサポートしている．たとえば，以下の項はprincipal typing $\langle \emptyset;\mathtt{int \to bool \to (int, bool)\rangle}$をもつ:`fun x -> let y = x + 1 in fun z-> (y, not z)`ただし，先程の項と$\alpha$同値だが名前が衝突する`fun x -> let y = x + 1 in fun x -> (y, not x)`は型付けできない．[2], p.417の$\vdash_{\land 2}^{\rm{LocNaive}}$と同じく， $\lambda$抽象の型付けのさいに$\alpha$変換を行なっていないからである．
+let多相は[2]の型付け規則$(\rm{LetPS})$([2]p.416, Fig. 5)によりサポートしている．たとえば，以下の項はprincipal typing $\langle \emptyset;\mathtt{int \to bool \to (int, bool)\rangle}$をもつ:`fun x -> let y = x + 1 in fun z-> (y, not z)`．ところが，これと $\alpha$同値だが名前が衝突する項`fun x -> let y = x + 1 in fun x -> (y, not x)`は型付けできない．[2], p.417で定義された型システム $\vdash_{\land 2}^{\rm{LocNaive}}$ と同じく， $\lambda$ 抽象の型付けのさいに $\alpha$ 変換を行なっていないからである．
  
 
 ## Syntax
