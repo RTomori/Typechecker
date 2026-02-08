@@ -2,13 +2,14 @@
 {-# LANGUAGE Strict            #-}
 
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-module PolyRec.Infer (showTyp) where
+module PolyRec.Infer (showTyp,normalize) where
 
 import           Control.Monad          (unless)
 import           Control.Monad.Except   (ExceptT, MonadError (throwError),
                                          catchError, runExceptT)
 import           Control.Monad.IO.Class (MonadIO)
-import           Control.Monad.Logger   (MonadLogger, logDebugN, logErrorN)
+import           Control.Monad.Logger   (MonadLogger, logDebugN, logErrorN,
+                                         logInfoN)
 import           Control.Monad.Reader   (MonadTrans (lift), ask)
 import           Control.Monad.State    (StateT, get, put, runStateT)
 import           Data.Map.Strict        (Map)
@@ -55,6 +56,13 @@ spc t0@(env0,ty0) t1@(env1,ty1) = do{
   s <-  unify ((ty0,ty1):Data.Map.Strict.elems (Map.intersectionWith (,) env0 env1));
   unless (apply s ty0 == ty1 && apply s ty1 == ty1) (throwError (SpcErr (show t0 ++ " does not specialize to " ++ show t1))) }
 
+-- | Compute the "normal form" of a type by shifting type variables.
+normalize :: Typing -> Typing
+normalize (env,ty) = (Map.map (apply subst) env, apply subst ty)
+  where
+    fVars = ftv (env,ty)
+    n = Set.size fVars
+    subst = Map.fromList $ zipWith (\i j -> (i, TyVar j)) (toList fVars) [0..n-1]
 
 infer :: (MonadIO m, MonadFail m, MonadLogger m) =>
          Int
@@ -89,19 +97,27 @@ infer _ (TmConst c) =
              do{
                 logDebugN(T.show c <> ":" <> T.show res);
                pure res}}
-
 infer k (TmAbs x e0) = do{
-  (hyp, u0) <- infer k e0;
   if Data.Set.member x (fVar e0)
-  then do{
-    case Map.lookup x hyp of
+  then
+    do{
+        _ <- lift newTyVar;
+  i <- get;
+  let newVar = "_" <> show i in
+    do{
+     (hyp, u0) <- infer k (termSubst x (TmVar newVar) e0);
+    -- (hyp,u0) <- infer k e0;
+    case Map.lookup newVar hyp of
       Just u  -> do{
-        let res = (Data.Map.Strict.delete x hyp, TyFun u u0) in do{
-        logDebugN(T.show (TmAbs x e0) <> ": "<> T.show res);
+        let res = (Data.Map.Strict.delete newVar hyp, TyFun u u0) in do{
+        -- logDebugN(T.show (TmAbs newVar (termSubst x (TmVar newVar) e0)) <> ": "<> T.show res);
+        logDebugN(T.show (TmAbs x e0) <> ":" <> T.show res);
         pure res}}
       Nothing -> throwError Impossible
   }
+    }
   else do{
+     (hyp, u0) <- infer k e0;
     a <- lift newTyVar;
     let res = (hyp, TyFun a u0) in do{
       logDebugN(T.show (TmAbs x e0) <> ":" <> T.show res);
@@ -110,18 +126,15 @@ infer k (TmAbs x e0) = do{
   }
 }
 infer k (TmApp e0 e1) = do{
-  -- Let <U0;u0> be the principal typing of e0 in environment D.
   (hyp,u0) <- infer k e0;
    case u0 of
      TyVar _ ->
-     -- If u0 = a (type variable), a1,a2 are fresh, typing <U1;u1> of e1 is fresh.
-     -- Let s be the mgu of the constraint set {u1 = a1, a = a1 -> a2}∪ {u' = u''|x:u' ∈ U0 and x:u''∈ U1}.
-     -- then <s(U0) ⊕s(U1); s(a2)> is the principal type of e = e0 e1.
+    -- |
       do{
        (hyp',u1) <- infer k e1;
         a1 <- lift newTyVar;
         a2 <- lift newTyVar;
-       s <- unify ((u1,a1):(u0,TyFun a1 a2):Data.Map.Strict.elems (Map.intersectionWith (,) hyp hyp'));
+       s <- unify ((a1,u1):(u0,TyFun a1 a2):Data.Map.Strict.elems (Map.intersectionWith (,) hyp hyp'));
        logDebugN("Substs:" <> T.show s);
        let hyp1 = Map.map (apply s) hyp in
        let hyp2 = Map.map (apply s) hyp' in
@@ -150,7 +163,7 @@ infer k (TmRec x e0) =
     (ask >>= \env -> fst <$> runStateT (inferRec k x e0) (1, t0 env (TmRec x e0)))
     (const $
       do{
-        logErrorN "Failed to find typing for term within given recursion limit";
+        logErrorN "Failed to type term within recursion limit";
         lift $ put 0;
         (env,u) <- infer k e0;
         case Map.lookup x env of
@@ -161,7 +174,6 @@ infer k (TmRec x e0) =
             pure (Map.map (apply s) env', apply s u)
           }
       })
--- | Numeric values cannot be variables by definition of lexer/scanners
 infer k (TmLet x e0 e) = do{
   ty0@(a0,_) <- infer k e0;
   i <- get;
@@ -213,7 +225,9 @@ showTyp' :: (MonadIO m, MonadLogger m, MonadFail m) => Int -> Term -> TI m (Env,
 showTyp' n t = do{
   res <- runExceptT (infer n t);
   env <- ask;
-  pure (env, res)
+  case res of
+    Left _ -> pure (env,res)
+    Right ty -> do{logInfoN ("Principal typing before normalization: " <> T.show ty);pure(env,Right $ normalize ty)}
 }
 showTyp :: (MonadLogger m,MonadFail m,MonadIO m) => Int -> Env -> Term -> m (Env,Either Error Typing)
 showTyp n env t = fst <$> runInfer (showTyp' n t) env 0

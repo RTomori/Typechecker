@@ -92,6 +92,7 @@ data Type where
   deriving (Eq)
 
 instance Show Type where
+  showsPrec :: Int -> Type -> ShowS
   showsPrec _ (TyVar x) = showString "v" .showsPrec 11 x
   showsPrec _ (TyCon TyInt) = showString "int"
   showsPrec _ (TyCon TyBool) = showString "bool"
@@ -139,9 +140,10 @@ termSubst y e (TmVar x) = if x == y then e else (TmVar x)
 termSubst _ _ (TmConst c) = TmConst c
 termSubst y e (TmApp e1 e2) = TmApp (termSubst y e e1) (termSubst y e e2)
 termSubst y e (TmRec x e0) = TmRec x (termSubst y e e0)
-termSubst y e (TmAbs x e0)
-  |y == x = TmAbs x e0
-  |y /= x && not(x `member` fVar e) = TmAbs x (termSubst y e e0)
+termSubst x e (TmAbs y e0)
+  |y == x = TmAbs y e0
+  |y /= x && not(y `member` fVar e) = TmAbs y (termSubst x e e0)
+  |otherwise = error ""
 termSubst y e (TmLet x e1 e2) = TmLet x (termSubst y e e1) (termSubst y e e2)-- operationally equivalent to (\x -> e2) e1 
 data Error = UnifyErr UnifyError|TypeError String|SpcErr String|MiscErr String|Impossible
   deriving (Eq,Show)

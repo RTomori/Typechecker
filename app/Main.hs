@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 import           Data.Text (Text,pack)                
-import           PolyRec.Infer                    (showTyp)
+import           PolyRec.Infer                    (showTyp,normalize)
 import           System.Console.Haskeline (InputT, defaultSettings,
                                            getInputLine, outputStrLn, runInputT)
 import           System.Environment       (getArgs)
 import qualified PolyRec.Lexer as Lexer
 import qualified PolyRec.Parser as Parser
-import PolyRec.Syntax (emptyEnv,Term)
+import PolyRec.Syntax (emptyEnv,Term,Type)
 import Control.Monad.Logger (runStderrLoggingT, runNoLoggingT)
 
 parseTerm :: Text -> Either String Term
