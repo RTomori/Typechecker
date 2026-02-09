@@ -162,4 +162,4 @@ f (hd xs): g(tl xs)
 ## References
 [1]Comini, M., Damiani, F., Vrech, S. (2008). On Polymorphic Recursion, Type Systems, and Abstract Interpretation. In: Alpuente, M., Vidal, G. (eds) Static Analysis. SAS 2008. Lecture Notes in Computer Science, vol 5079. Springer, Berlin, Heidelberg. https://doi.org/10.1007/978-3-540-69166-2_10
 
-[2]Ferruccio Damiani. 2007. Rank 2 Intersection for Recursive Definitions. Fundam. Inf. 77, 4 (August 2007), 451–488.
+[2]Ferruccio Damiani. 2003. Rank 2 intersection types for local definitions and conditional expressions. ACM Trans. Program. Lang. Syst. 25, 4 (July 2003), 401–451. https://doi.org/10.1145/778559.778560
